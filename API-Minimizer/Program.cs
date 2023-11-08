@@ -1,3 +1,6 @@
+﻿using API_Minimizer.Controllers;
+using API_Minimizer.Model;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -21,5 +24,7 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapEnviromentsEndpoints();
 
 app.Run();
