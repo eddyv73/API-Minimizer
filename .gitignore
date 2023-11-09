@@ -14,3 +14,11 @@ API-Minimizer/ApiFront/.vs/
 API-Minimizer/ApiFront/bin/
 
 API-Minimizer/ApiFront/obj/
+
+API-Minimizer/MinimizerModel/MinimizerCommon/bin/
+
+API-Minimizer/MinimizerModel/MinimizerCommon/obj/
+
+bin/*
+
+obj/*
