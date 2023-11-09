@@ -4,3 +4,24 @@ API-Minimizer/obj/
 API-Minimizer/bin/
 
 API-Minimizer/.vs/
+
+API-Minimizer/ApiBack/API-Minimizer-back/bin/
+
+API-Minimizer/ApiBack/API-Minimizer-back/obj/
+
+API-Minimizer/ApiFront/.vs/
+
+API-Minimizer/ApiFront/bin/
+
+API-Minimizer/ApiFront/obj/
+
+API-Minimizer/MinimizerModel/MinimizerCommon/bin/
+
+API-Minimizer/MinimizerModel/MinimizerCommon/obj/
+
+bin/*
+
+obj/*
+API-Minimizer/MinimizerTest/Minimizertest/bin/
+
+API-Minimizer/MinimizerTest/Minimizertest/obj/

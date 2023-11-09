@@ -1,0 +1,20 @@
+name: Docker-Compose
+
+on:
+  push:
+    branches: [ "*" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  Docker-compose_Build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Docker-Compose Build
+      run: docker-compose -f ./API-Minimizer/docker-compose.yml build
+
+
+  
