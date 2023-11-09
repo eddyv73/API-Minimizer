@@ -8,6 +8,7 @@ on:
 env :
     REGISTRY: ghcr.io/${{ github.actor }}
     DOCKER_REGISTRY-: ghcr.io/${{ github.actor }}
+    DOCKER_REGISTRY: ghcr.io/${{ github.actor }}
 jobs:
   Docker-compose_Build:
 
@@ -29,3 +30,4 @@ jobs:
 
     - name: Docker-Compose Push
       run: docker-compose -f ./API-Minimizer/docker-compose.yml push
+    
