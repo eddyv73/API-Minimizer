@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Restore dependencies
-      run: docker-compose -f .\API-Minimizer\docker-compose.yml build
+      run: docker-compose -f ./API-Minimizer/docker-compose.yml build
 
 
   
