@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace MinimizerCommon.Commons
 {
-    internal class LifeCheck
+    public class LifeCheck
     {
         public string Name { get; set; }
         public bool Status { get; set; }

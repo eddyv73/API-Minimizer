@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using MinimizerCommon.Commons;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -24,8 +25,14 @@ namespace API_Minimizer_back.Controllers
 
         // POST api/<StatusController>
         [HttpPost]
-        public void Post([FromBody] string value)
+        public IActionResult Post([FromBody] string value)
         {
+            var status = new LifeCheck();
+            status.Datetime = DateTime.Now;
+            status.Name = "OK";
+            status.Status = true;
+
+            return Ok(status);
         }
 
         // PUT api/<StatusController>/5
