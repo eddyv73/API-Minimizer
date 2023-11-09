@@ -7,10 +7,10 @@ EXPOSE 443
 
 FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
 WORKDIR /src
-COPY ["API-Minimizer.csproj", "."]
-RUN dotnet restore "./API-Minimizer.csproj"
+COPY ["ApiFront/API-Minimizer.csproj", "ApiFront/"]
+RUN dotnet restore "ApiFront/API-Minimizer.csproj"
 COPY . .
-WORKDIR "/src/."
+WORKDIR "/src/ApiFront"
 RUN dotnet build "API-Minimizer.csproj" -c Release -o /app/build
 
 FROM build AS publish

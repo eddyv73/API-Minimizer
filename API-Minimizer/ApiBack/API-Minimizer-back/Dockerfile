@@ -8,6 +8,7 @@ EXPOSE 443
 FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
 WORKDIR /src
 COPY ["ApiBack/API-Minimizer-back/API-Minimizer-back.csproj", "ApiBack/API-Minimizer-back/"]
+COPY ["MinimizerModel/MinimizerCommon/MinimizerCommon.csproj", "MinimizerModel/MinimizerCommon/"]
 RUN dotnet restore "ApiBack/API-Minimizer-back/API-Minimizer-back.csproj"
 COPY . .
 WORKDIR "/src/ApiBack/API-Minimizer-back"
