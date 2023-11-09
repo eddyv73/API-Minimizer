@@ -8,6 +8,13 @@ namespace MinimizerCommon.Commons
 {
     public class LifeCheck
     {
+        public LifeCheck(string name, bool status)
+        {
+            Name = name;
+            Status = status;
+            Datetime = DateTime.Now;
+        }
+
         public string Name { get; set; }
         public bool Status { get; set; }
         public DateTime Datetime { get; set; }

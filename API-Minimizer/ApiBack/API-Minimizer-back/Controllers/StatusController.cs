@@ -27,11 +27,7 @@ namespace API_Minimizer_back.Controllers
         [HttpPost]
         public IActionResult Post([FromBody] string value)
         {
-            var status = new LifeCheck();
-            status.Datetime = DateTime.Now;
-            status.Name = "OK";
-            status.Status = true;
-
+            var status = new LifeCheck("BackApi",true);
             return Ok(status);
         }
 
