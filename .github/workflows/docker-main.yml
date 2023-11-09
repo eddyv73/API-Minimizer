@@ -7,6 +7,7 @@ on:
     branches: [ "main" ]
 env :
     REGISTRY: ghcr.io/${{ github.actor }}
+    DOCKER_REGISTRY-: ghcr.io/${{ github.actor }}
 jobs:
   Docker-compose_Build:
 
@@ -25,3 +26,6 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.CR_PAT }}
+
+    - name: Docker-Compose Push
+      run: docker-compose -f ./API-Minimizer/docker-compose.yml push
