@@ -37,5 +37,12 @@ namespace Minimizertest
             if (string.IsNullOrEmpty(_lifecheck.Name))
                 Assert.Fail();
         }
+        
+        [Test]
+        public void Test4()
+        {
+            if (string.IsNullOrEmpty(_lifecheck.Name))
+                Assert.Fail();
+        }
     }
 }
