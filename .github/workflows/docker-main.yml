@@ -27,7 +27,10 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.CR_PAT }}
+        
 
-    - name: Docker-Compose Push
-      run: docker-compose -f ./API-Minimizer/docker-compose.yml push
+    # - name: Docker-Compose Push
+    #   run: docker-compose -f ./API-Minimizer/docker-compose.yml push 
+      
+
     
