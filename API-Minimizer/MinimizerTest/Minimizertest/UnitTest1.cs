@@ -43,6 +43,7 @@ namespace Minimizertest
         {
             if (string.IsNullOrEmpty(_lifecheck.Name))
                 Assert.Fail();
+                # update
         }
     }
 }
