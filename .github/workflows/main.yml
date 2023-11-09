@@ -45,8 +45,6 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: 6.0.x
-    - name: Restore dependencies
-      run: dotnet restore API-Minimizer/API-Minimizer.sln
     - name: Tests
       run: dotnet test API-Minimizer/API-Minimizer.sln
   
