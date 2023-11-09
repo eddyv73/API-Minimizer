@@ -11,6 +11,8 @@ Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-co
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MinimizerCommon", "MinimizerModel\MinimizerCommon\MinimizerCommon.csproj", "{81F23671-F98D-4C12-9346-7550E29C73E1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Minimizertest", "MinimizerTest\Minimizertest\Minimizertest.csproj", "{1F6ACF0C-791A-41B7-ABFE-E51D6C0F77E0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{81F23671-F98D-4C12-9346-7550E29C73E1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{81F23671-F98D-4C12-9346-7550E29C73E1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{81F23671-F98D-4C12-9346-7550E29C73E1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1F6ACF0C-791A-41B7-ABFE-E51D6C0F77E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F6ACF0C-791A-41B7-ABFE-E51D6C0F77E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F6ACF0C-791A-41B7-ABFE-E51D6C0F77E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F6ACF0C-791A-41B7-ABFE-E51D6C0F77E0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

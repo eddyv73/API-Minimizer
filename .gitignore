@@ -22,3 +22,6 @@ API-Minimizer/MinimizerModel/MinimizerCommon/obj/
 bin/*
 
 obj/*
+API-Minimizer/MinimizerTest/Minimizertest/bin/
+
+API-Minimizer/MinimizerTest/Minimizertest/obj/
