@@ -1,50 +1,35 @@
+using NUnit.Framework;
 using MinimizerCommon.Commons;
 
 namespace Minimizertest
 {
     public class Tests
     {
+        private LifeCheck _lifecheck;
         [SetUp]
         public void Setup()
         {
+            _lifecheck = new LifeCheck("BackApi", true);
         }
 
         [Test]
         public void Test1()
         {
-            var lifecheck = new LifeCheck("BackApi", true);
-
-            if (lifecheck == null)
-            {
-                Assert.Fail();
-            }
-            if (lifecheck.Status is false)
-                Assert.Fail();
-            if (String.IsNullOrEmpty(lifecheck.Name))
-                Assert.Fail();
-
-            Assert.Pass();
+            Assert.IsNotNull(_lifecheck);
         }
+
         [Test]
         public void Test2()
         {
-            var lifecheck = new LifeCheck("BackApi", true);
-
-
-            if (lifecheck.Status is false)
+            if (_lifecheck.Status is false)
                 Assert.Fail();
-
-            Assert.Pass();
         }
+
         [Test]
         public void Test3()
         {
-            var lifecheck = new LifeCheck("BackApi", true);
-
-            if (String.IsNullOrEmpty(lifecheck.Name))
+            if (string.IsNullOrEmpty(_lifecheck.Name))
                 Assert.Fail();
-
-            Assert.Pass();
         }
     }
 }
