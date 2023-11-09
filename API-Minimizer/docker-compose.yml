@@ -2,13 +2,13 @@ version: '3.4'
 
 services:
   api-minimizer:
-    image: ${DOCKER_REGISTRY-}apiminimizer
+    image: ${DOCKER_REGISTRY-}/apiminimizer
     build:
       context: .
       dockerfile: ApiFront/Dockerfile
 
   api-minimizer-back:
-    image: ${DOCKER_REGISTRY-}apiminimizerback
+    image: ${DOCKER_REGISTRY-}/apiminimizerback
     build:
       context: .
       dockerfile: ApiBack/API-Minimizer-back/Dockerfile

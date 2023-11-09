@@ -1,11 +1,17 @@
 using NUnit.Framework;
 using MinimizerCommon.Commons;
 
+/// <summary>
+/// Contains unit tests for the <see cref="LifeCheck"/> class.
+/// </summary>
 namespace Minimizertest
 {
     public class Tests
     {
         private LifeCheck _lifecheck;
+        /// <summary>
+        /// This method is called before each test method is executed to set up the test environment.
+        /// </summary>
         [SetUp]
         public void Setup()
         {
@@ -27,6 +33,13 @@ namespace Minimizertest
 
         [Test]
         public void Test3()
+        {
+            if (string.IsNullOrEmpty(_lifecheck.Name))
+                Assert.Fail();
+        }
+        
+        [Test]
+        public void Test4()
         {
             if (string.IsNullOrEmpty(_lifecheck.Name))
                 Assert.Fail();
