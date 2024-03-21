@@ -72,5 +72,33 @@ namespace API_Minimizer_back.Controllers
         public void Delete(int id)
         {
         }
+        // add new method to return the time of the server
+        [HttpGet("time")]
+        public IActionResult GetTime()
+        {
+            return Ok(DateTime.Now);
+        }
+        // add new method to return array of times of the server utc and gmt -5
+        /// <summary>
+        /// Gets the current times.
+        /// </summary>
+        /// <returns>An <see cref="IActionResult"/> containing the current times.</returns>
+        [HttpGet("times")]
+        public IActionResult GetTimes()
+        {
+            return Ok(new string[] { DateTime.Now.ToUniversalTime().ToString(), DateTime.Now.AddHours(-5).ToString() });
+        }
+
+              // give me the curl to test the method GetTimes
+        // curl -X GET "https://localhost:5001/api/status/times" -H  "accept: text/plain"
+        
+        //create a new method for time zone mexico
+        [HttpGet("timezone")]
+        public IActionResult GetTimeZone()
+        {
+            var timeZones = new TimesZones();
+            return Ok(timeZones);
+        }
+
     }
 }

@@ -45,6 +45,21 @@ namespace Minimizertest
                 Assert.Fail();
         }
 
+        // create a test for contructor of the class TimeZones
+        [Test]
+        public void Test5()
+        {
+            var timeZones = new TimesZones();
+            Assert.IsNotNull(timeZones);
+        }
+        // create a new method to return the time zones using the class TimesZones, and acept a object in the query string with timezone required and validate if the string is valid for a time zone  
+        [Test]
+        public void Test6()
+        {
+            var timeZones = new TimesZones();
+            var timeZone = timeZones.TimeZones.Find(x => x.Name == "UTC");
+            Assert.IsNotNull(timeZone);
+        }        
 
     }
 }
