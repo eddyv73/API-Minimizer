@@ -1,6 +1,6 @@
 using NUnit.Framework;
 using MinimizerCommon.Commons;
-
+using API_Minimizer_back.Controllers;
 /// <summary>
 /// Contains unit tests for the <see cref="LifeCheck"/> class.
 /// </summary>
@@ -44,5 +44,7 @@ namespace Minimizertest
             if (string.IsNullOrEmpty(_lifecheck.Name))
                 Assert.Fail();
         }
+
+
     }
 }

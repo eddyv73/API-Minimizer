@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\ApiBack\API-Minimizer-back\API-Minimizer-back.csproj" />
     <ProjectReference Include="..\..\MinimizerModel\MinimizerCommon\MinimizerCommon.csproj" />
   </ItemGroup>
 
