@@ -72,5 +72,37 @@ namespace API_Minimizer_back.Controllers
         public void Delete(int id)
         {
         }
+
+
+        // add new method to return the time of the server
+        [HttpGet("time")]
+        public IActionResult GetTime()
+        {
+            return Ok(DateTime.Now);
+        }
+        // add new method to return array of times of the server utc and gmt-5
+        /// <summary>
+        /// Gets the current times.
+        /// </summary>
+        /// <returns>An <see cref="IActionResult"/> representing the HTTP response.</returns>
+        [HttpGet("times")]
+        public IActionResult GetTimes()
+        {
+            return Ok(new string[] { DateTime.Now.ToUniversalTime().ToString(), DateTime.Now.AddHours(-5).ToString() });
+        }
+
+        // create a new method to return the time zones using the class TimesZones, and acept a object in the query string with timezone required
+        public IActionResult GetTimeZones([FromQuery] string timezone)
+        {
+            var times = new TimesZones();
+            if (string.IsNullOrEmpty(timezone))
+            {
+                return Ok(times.TimeZones);
+            }
+            else
+            {
+                return Ok(times.TimeZones.Where(x => x.Name == timezone));
+            }
+        }
     }
 }
