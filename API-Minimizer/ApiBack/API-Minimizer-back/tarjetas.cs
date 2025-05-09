@@ -11,7 +11,7 @@ namespace BancoApp
         public string TipoTarjeta { get; set; }  // Débito, Crédito, Prepago
         public string EntidadEmisora { get; set; }
         public string RedProcesadora { get; set; }  // Visa, Mastercard, American Express
-        public string BIN { get; set; }  // Bank Identification Number (6 primeros dígitos)
+        public string BINa { get; set; }  // Bank Identification Number (6 primeros dígitos)
         
         // Datos del titular
         public string NombreTitular { get; set; }
