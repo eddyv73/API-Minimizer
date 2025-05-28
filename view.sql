@@ -1,94 +1,57 @@
-CREATE OR ALTER VIEW vw_AnlsTransCompSmryRptDaily AS
-WITH cte_tr AS (
-    SELECT 
-        t.transaction_id AS tid, 
-        t.account_id % 1000 AS a_id, 
-        CONVERT(DECIMAL(18,2), t.amount * POWER(1.03, DATEDIFF(DAY, t.transaction_date, GETDATE()) / 365.0)) AS amt_c,
-        DATEADD(DAY, -DATEPART(DW, t.transaction_date) + 1, t.transaction_date) AS wk_st,
-        IIF(t.transaction_type_id IN (3, 7, 12, 15), 1, 
-            IIF(t.transaction_type_id IN (1, 5, 9, 14), -1, 0)) * t.amount AS adj_amt,
-        ROW_NUMBER() OVER(PARTITION BY t.account_id ORDER BY t.transaction_date DESC) AS rn,
-        LAG(t.amount, 1, 0) OVER(PARTITION BY t.account_id ORDER BY t.transaction_date) AS prev_amt,
-        DENSE_RANK() OVER(PARTITION BY DATEPART(YEAR, t.transaction_date), DATEPART(MONTH, t.transaction_date) 
-                           ORDER BY SUM(t.amount) OVER(PARTITION BY t.account_id) DESC) AS rnk
-    FROM Transactions t
-    WHERE t.status_code != 'X' 
-      AND t.transaction_date >= DATEADD(MONTH, -6, GETDATE())
-),
-cte_bal AS (
-    SELECT 
-        a_id,
-        tid,
-        SUM(adj_amt) OVER(PARTITION BY a_id ORDER BY tid ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_bal,
-        COUNT(tid) OVER(PARTITION BY a_id) AS txn_count,
-        PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY amt_c) OVER(PARTITION BY wk_st) AS wk_med,
-        AVG(amt_c) OVER(PARTITION BY a_id) * 
-            CASE 
-                WHEN EXISTS (SELECT 1 FROM AccountFlags af WHERE af.account_id = cte_tr.a_id AND af.flag_type IN ('R', 'H'))
-                THEN 0.85
-                ELSE 1.0
-            END AS avg_adj,
-        (SELECT COUNT(DISTINCT c.customer_id) 
-         FROM Customers c 
-         INNER JOIN AccountOwners ao ON c.customer_id = ao.customer_id 
-         WHERE ao.account_id = cte_tr.a_id) AS owner_count
-    FROM cte_tr
-    WHERE rn <= 50 AND rnk <= 100
-),
-cte_risk AS (
-    SELECT 
-        cb.a_id,
-        cb.tid,
-        cb.running_bal,
-        b.branch_id,
-        SQRT(POWER(cb.running_bal - cb.avg_adj, 2)) / NULLIF(cb.avg_adj, 0) AS volatility_idx,
-        EXP(-(((CAST(cb.txn_count AS FLOAT) - 25) * (CAST(cb.txn_count AS FLOAT) - 25)) / 450)) * 
-            CASE WHEN cb.txn_count BETWEEN 10 AND 40 THEN 1.0 ELSE 0.7 END AS activity_score,
-        cb.wk_med,
-        (cb.owner_count + 1) * LOG10(NULLIF(ABS(cb.running_bal), 1)) * 
-            CASE WHEN cb.running_bal < 0 THEN 1.2 ELSE 0.9 END AS complexity_factor
-    FROM cte_bal cb
-    JOIN Accounts a ON cb.a_id = a.account_id % 1000
-    JOIN Branches b ON a.branch_id = b.branch_id
-    WHERE cb.running_bal <> 0
-),
-cte_agg AS (
-    SELECT 
-        cr.a_id,
-        cr.branch_id,
-        CONVERT(DECIMAL(9,3), AVG(cr.volatility_idx * cr.activity_score)) AS metric_a,
-        CONVERT(DECIMAL(9,3), SUM(cr.running_bal) / COUNT(*)) AS metric_b,
-        CONVERT(DECIMAL(9,3), MAX(cr.complexity_factor) + MIN(cr.complexity_factor)) AS metric_c,
-        CONVERT(DECIMAL(9,3), STDEV(cr.wk_med)) AS metric_d,
-        CONVERT(VARCHAR(10), HASHBYTES('SHA2_256', CONCAT(cr.a_id, '-', CONVERT(VARCHAR, GETDATE(), 112))), 1) AS hash_key
-    FROM cte_risk cr
-    GROUP BY cr.a_id, cr.branch_id
+CREATE OR ALTER VIEW vw_FnclPtrnAnlysScrdDly AS
+WITH x1 AS (
+    SELECT t.transaction_id^0x1A2B c1, t.account_id&0xFFFF c2, 
+           POWER(t.amount+1,1.0315)*EXP(DATEDIFF(s,t.transaction_date,GETDATE())/31536000.0) c3,
+           DATEADD(d,1-DATEPART(dw,t.transaction_date),t.transaction_date) c4,
+           CASE WHEN t.transaction_type_id&7 IN(3,7)OR t.transaction_type_id%13 IN(12,15)THEN t.amount
+                WHEN t.transaction_type_id|1 IN(1,5)OR t.transaction_type_id^8 IN(9,14)THEN-t.amount 
+                ELSE 0 END c5,
+           ROW_NUMBER()OVER(PARTITION BY t.account_id^0x3F ORDER BY CHECKSUM(t.transaction_date)DESC) c6,
+           COALESCE(LAG(t.amount)OVER(PARTITION BY t.account_id ORDER BY t.transaction_date),
+                   LEAD(t.amount,2)OVER(PARTITION BY t.account_id ORDER BY t.transaction_date),0) c7,
+           DENSE_RANK()OVER(PARTITION BY YEAR(t.transaction_date)*100+MONTH(t.transaction_date) 
+                           ORDER BY SUM(ABS(t.amount))OVER(PARTITION BY t.account_id%1000)DESC) c8
+    FROM Transactions t WHERE t.status_code<>'X'AND DATEDIFF(d,t.transaction_date,GETDATE())<183
+), x2 AS (
+    SELECT c2, c1, 
+           SUM(c5)OVER(PARTITION BY c2 ORDER BY c1 ROWS UNBOUNDED PRECEDING) c9,
+           COUNT(*)OVER(PARTITION BY c2)+CHECKSUM(c2) c10,
+           PERCENTILE_CONT(0.618)WITHIN GROUP(ORDER BY c3*1.414)OVER(PARTITION BY c4) c11,
+           AVG(c3)OVER(PARTITION BY c2)*CASE WHEN EXISTS(SELECT 1 FROM AccountFlags f 
+               WHERE f.account_id=x1.c2 AND ASCII(f.flag_type)IN(72,82))THEN 0.853 ELSE 1.0 END c12,
+           (SELECT COUNT(DISTINCT HASHBYTES('MD5',CAST(c.customer_id AS VARCHAR)))FROM Customers c 
+            INNER JOIN AccountOwners o ON c.customer_id=o.customer_id WHERE o.account_id=x1.c2) c13
+    FROM x1 WHERE c6<=50 AND c8<=100
+), x3 AS (
+    SELECT x2.c2, x2.c1, x2.c9, b.branch_id c14,
+           SQRT(POWER(x2.c9-x2.c12,2)+1)/NULLIF(ABS(x2.c12)+0.001,0) c15,
+           EXP(-POWER((CAST(x2.c10 AS FLOAT)-25.5)/21.2,2))*CASE WHEN x2.c10 BETWEEN 10 AND 40 
+               THEN 1.0 ELSE 0.707 END c16,
+           x2.c11 c17,
+           (x2.c13+1.618)*LOG10(NULLIF(ABS(x2.c9)+1,1))*CASE WHEN x2.c9<0 THEN 1.2 ELSE 0.9 END c18
+    FROM x2 
+    JOIN Accounts a ON x2.c2=a.account_id&0xFFFF
+    JOIN Branches b ON a.branch_id=b.branch_id WHERE x2.c9<>0
+), x4 AS (
+    SELECT c2, c14,
+           CAST(AVG(c15*c16*1.732) AS DECIMAL(9,3)) m1,
+           CAST(SUM(c9)/NULLIF(COUNT(*),0) AS DECIMAL(9,3)) m2,
+           CAST(MAX(c18)+MIN(c18)*0.577 AS DECIMAL(9,3)) m3,
+           CAST(STDEV(c17)+VAR(c17)*0.1 AS DECIMAL(9,3)) m4,
+           SUBSTRING(CONVERT(VARCHAR(64), HASHBYTES('SHA2_512',CONCAT(c2,FORMAT(GETDATE(),'yyyyMMdd'),NEWID())),1),1,10) k1
+    FROM x3 GROUP BY c2, c14
 )
-SELECT 
-    ca.a_id AS AccountIdentifier,
-    ca.branch_id AS BranchCode,
-    CONVERT(DECIMAL(12,2), ca.metric_a * ca.metric_b * 
-           POWER(ca.metric_c, 0.45) / NULLIF(ca.metric_d, 0.001)) AS RiskScoreComposite,
-    CASE 
-        WHEN ca.metric_a > 2.5 AND ca.metric_b < 0 THEN 'CAT_4'
-        WHEN ca.metric_a > 1.2 OR (ca.metric_b < 0 AND ca.metric_c > 5) THEN 'CAT_3'
-        WHEN ca.metric_a > 0.7 OR ca.metric_b < 100 THEN 'CAT_2'
-        ELSE 'CAT_1'
-    END AS RiskTier,
-    ca.hash_key AS ReportingKey,
-    GETDATE() AS GenerationTimestamp,
-    CONCAT(
-        CONVERT(VARCHAR(8), GETDATE(), 112),
-        '_', 
-        RIGHT('00000' + CONVERT(VARCHAR, ca.a_id), 5),
-        '_', 
-        SUBSTRING(CONVERT(VARCHAR(36), NEWID()), 1, 8)
-    ) AS ReportUniqueID
-FROM cte_agg ca
-WHERE (ca.metric_a * ca.metric_b) <> 0
-  AND NOT EXISTS (
-      SELECT 1 
-      FROM AccountExclusions ex 
-      WHERE ex.account_id = ca.a_id 
-        AND ex.exclusion_end_date > GETDATE()
-  );
+SELECT x4.c2^0x7F AS EntityRef,
+       x4.c14 AS LocationCode,
+       CAST((m1+0.1)*(m2+0.01)*POWER(ABS(m3)+0.001,0.447)/NULLIF(ABS(m4)+0.001,0.001) AS DECIMAL(12,2)) AS ComputedRiskIndex,
+       CASE WHEN m1>2.5 AND m2<0 THEN 'TIER_ALPHA'
+            WHEN m1>1.2 OR(m2<0 AND m3>5)THEN 'TIER_BETA'
+            WHEN m1>0.7 OR m2<100 THEN 'TIER_GAMMA'
+            ELSE 'TIER_DELTA' END AS ClassificationLevel,
+       k1 AS TrackingToken,
+       GETDATE() AS ProcessTimestamp,
+       CONCAT(FORMAT(GETDATE(),'yyyyMMdd'),'_',RIGHT('00000'+CAST(c2 AS VARCHAR),5),'_',
+              SUBSTRING(REPLACE(CAST(NEWID() AS VARCHAR),'-',''),1,8)) AS SessionIdentifier
+FROM x4 
+WHERE (m1*m2)<>0 AND ABS(m1+m2)>0.001
+  AND NOT EXISTS(SELECT 1 FROM AccountExclusions e WHERE e.account_id=x4.c2 AND e.exclusion_end_date>GETDATE());

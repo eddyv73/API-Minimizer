@@ -9,13 +9,15 @@ AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
-    
-    DECLARE @v_cur_dt DATETIME = ISNULL(@p_dt_init, GETDATE());
-    DECLARE @v_rsk_fctr DECIMAL(14,6) = 1.0;
-    DECLARE @v_proc_id UNIQUEIDENTIFIER = NEWID();
-    DECLARE @v_err_msg NVARCHAR(2000);
-    DECLARE @v_trans_cnt INT = 0;
-    DECLARE @v_runtm_md INT = CAST(LEFT(REPLACE(@p_proc_opts, 'STD', '2'), 1) AS INT);
+
+    DECLARE 
+        @v_cur_dt DATETIME = ISNULL(@p_dt_init, GETDATE()),
+        @v_rsk_fctr DECIMAL(14,6) = 1.0,
+        @v_proc_id UNIQUEIDENTIFIER = NEWID(),
+        @v_err_msg NVARCHAR(2000),
+        @v_trans_cnt INT = 0,
+        @v_runtm_md INT = CAST(LEFT(REPLACE(@p_proc_opts, 'STD', '2'), 1) AS INT);
+
     DECLARE @v_tbl_tmp TABLE (
         id_seq INT IDENTITY(1,1),
         acct_id INT,
@@ -26,26 +28,31 @@ BEGIN
         scr_val DECIMAL(10,4),
         hash_id VARBINARY(16)
     );
-    
+
+    -- Helper: Log process execution
+    DECLARE @log_params NVARCHAR(400) = CONCAT(
+        'dt=', CONVERT(VARCHAR, @p_dt_init), 
+        ', flg=', @p_flg_type, 
+        ', thrs=', @p_thrs_val,
+        ', acct=', @p_acct_id,
+        ', opt=', @p_proc_opts
+    );
+
     BEGIN TRY
         IF @@TRANCOUNT = 0
             BEGIN TRANSACTION;
-        
-        -- Initialize output parameter
+
         SET @p_out_status = 0;
-        
-        -- Apply special thresholds based on flags
+
+        -- 1. Risk factor adjustment
         IF EXISTS (SELECT 1 FROM SysFlags WHERE flag_type = 'R' AND active_flag = 1)
         BEGIN
-            SET @v_rsk_fctr = (SELECT 
-                                  EXP(SUM(LOG(NULLIF(val_numeric, 0)))) 
-                               FROM SysParams 
-                               WHERE param_group = 'RISK' 
-                                 AND active_flag = 1 
-                                 AND param_seq <= @p_flg_type * 2);
+            SELECT @v_rsk_fctr = EXP(SUM(LOG(NULLIF(val_numeric, 0))))
+            FROM SysParams
+            WHERE param_group = 'RISK' AND active_flag = 1 AND param_seq <= @p_flg_type * 2;
         END
-        
-        -- Materialize temp data with bizarre scoring logic
+
+        -- 2. Materialize temp data
         INSERT INTO @v_tbl_tmp (acct_id, cust_id, tran_amt, tran_dt, cat_cd, scr_val, hash_id)
         SELECT 
             a.account_id,
@@ -55,26 +62,21 @@ BEGIN
                     WHEN t.transaction_type_id % 5 = 0 THEN POWER(1.03, FLOOR(RAND(CHECKSUM(NEWID())) * 10))
                     WHEN t.transaction_type_id % 3 = 0 THEN POWER(0.97, FLOOR(RAND(CHECKSUM(NEWID())) * 8))
                     ELSE 1.0
-                END AS adj_amount,
+                END,
             t.transaction_date,
             COALESCE(tt.category_code, 'UNK'),
             CASE 
                 WHEN t.amount > 10000 THEN 
-                    (LOG10(t.amount) * 2.5) / 
-                    NULLIF(SQRT(DATEDIFF(DAY, c.customer_since_date, @v_cur_dt) + 1), 0) *
+                    (LOG10(t.amount) * 2.5) / NULLIF(SQRT(DATEDIFF(DAY, c.customer_since_date, @v_cur_dt) + 1), 0) *
                     IIF(t.location_id = a.branch_id, 0.8, 1.2)
                 WHEN t.amount BETWEEN 1000 AND 10000 THEN
-                    (LOG10(t.amount) * 1.8) /
-                    NULLIF(SQRT(DATEDIFF(DAY, c.customer_since_date, @v_cur_dt) + 1), 0) *
+                    (LOG10(t.amount) * 1.8) / NULLIF(SQRT(DATEDIFF(DAY, c.customer_since_date, @v_cur_dt) + 1), 0) *
                     IIF(t.location_id = a.branch_id, 0.9, 1.1)
                 ELSE
-                    (LOG10(NULLIF(t.amount, 0) + 1) * 1.2) /
-                    NULLIF(SQRT(DATEDIFF(DAY, c.customer_since_date, @v_cur_dt) + 1), 0) *
+                    (LOG10(NULLIF(t.amount, 0) + 1) * 1.2) / NULLIF(SQRT(DATEDIFF(DAY, c.customer_since_date, @v_cur_dt) + 1), 0) *
                     IIF(t.location_id = a.branch_id, 1.0, 1.05)
-            END * @v_rsk_fctr AS score_value,
-            HASHBYTES('MD5', CONCAT(CONVERT(VARCHAR, a.account_id), '-', 
-                                    CONVERT(VARCHAR, t.transaction_id), '-',
-                                    CONVERT(VARCHAR, @v_proc_id)))
+            END * @v_rsk_fctr,
+            HASHBYTES('MD5', CONCAT(CONVERT(VARCHAR, a.account_id), '-', CONVERT(VARCHAR, t.transaction_id), '-', CONVERT(VARCHAR, @v_proc_id)))
         FROM Transactions t
         INNER JOIN Accounts a ON t.account_id = a.account_id
         INNER JOIN AccountOwners ao ON a.account_id = ao.account_id
@@ -84,14 +86,12 @@ BEGIN
           AND t.transaction_date BETWEEN DATEADD(DAY, -90, @v_cur_dt) AND @v_cur_dt
           AND t.status_code <> 'X'
           AND t.amount <> 0;
-        
-        -- Get transaction count
+
         SET @v_trans_cnt = @@ROWCOUNT;
-        
-        -- Apply correlation matrix and pattern detection if enough data exists
+
+        -- 3. Correlation matrix and risk scoring
         IF @v_trans_cnt >= 5
         BEGIN
-            -- Create temporary correlation scoring table
             DECLARE @v_corr_tmp TABLE (
                 acct_id INT,
                 pattern_score DECIMAL(10,4),
@@ -100,9 +100,9 @@ BEGIN
                 amount_volatility DECIMAL(12,4),
                 final_risk_score DECIMAL(12,4)
             );
-            
-            -- Insert complex correlation scores
-            INSERT INTO @v_corr_tmp
+
+            -- Pattern score
+            INSERT INTO @v_corr_tmp (acct_id, pattern_score, time_anomaly_idx, location_diversity, amount_volatility, final_risk_score)
             SELECT 
                 tmp.acct_id,
                 (
@@ -118,7 +118,7 @@ BEGIN
                     WHERE inner_tmp.acct_id = tmp.acct_id
                     GROUP BY inner_tmp.cat_cd
                     HAVING COUNT(*) > 1
-                ) AS patt_score,
+                ),
                 (
                     SELECT 
                         VARIANCE(DATEDIFF(MINUTE, LAG(inner_tmp.tran_dt, 1) OVER (ORDER BY inner_tmp.tran_dt), inner_tmp.tran_dt)) / 
@@ -130,27 +130,25 @@ BEGIN
                         END
                     FROM @v_tbl_tmp inner_tmp
                     WHERE inner_tmp.acct_id = tmp.acct_id
-                ) AS time_idx,
+                ),
                 (
                     SELECT 
-                        COUNT(DISTINCT t.location_id) * 1.0 / 
-                        NULLIF(COUNT(t.transaction_id), 0) * 
+                        COUNT(DISTINCT t.location_id) * 1.0 / NULLIF(COUNT(t.transaction_id), 0) * 
                         SQRT(SUM(SQUARE(tmp.tran_amt)) / NULLIF(SUM(ABS(tmp.tran_amt)), 0))
                     FROM Transactions t
                     WHERE t.account_id = tmp.acct_id
                       AND t.transaction_date >= DATEADD(DAY, -60, @v_cur_dt)
-                ) AS loc_div,
+                ),
                 (
-                    SELECT 
-                        STDEV(inner_tmp.tran_amt) / NULLIF(AVG(ABS(inner_tmp.tran_amt)), 0.001)
+                    SELECT STDEV(inner_tmp.tran_amt) / NULLIF(AVG(ABS(inner_tmp.tran_amt)), 0.001)
                     FROM @v_tbl_tmp inner_tmp
                     WHERE inner_tmp.acct_id = tmp.acct_id
-                ) AS amt_vol,
-                0 -- Placeholder for final score to be updated
+                ),
+                0
             FROM @v_tbl_tmp tmp
             GROUP BY tmp.acct_id;
-            
-            -- Apply final risk score calculation with weighted formula
+
+            -- Final risk score
             UPDATE c
             SET c.final_risk_score = 
                 CASE 
@@ -165,26 +163,22 @@ BEGIN
                     ) * @v_rsk_fctr
                 END
             FROM @v_corr_tmp c;
-            
-            -- Merge/insert results into permanent table based on processing mode
-            IF @v_runtm_md = 1 -- Audit mode
+
+            -- 4. Output by mode
+            IF @v_runtm_md = 1
             BEGIN
                 INSERT INTO RiskAuditLog (
                     account_id, process_id, process_date, risk_score, 
                     threshold_value, exceeded_flag, comments, created_date
                 )
                 SELECT 
-                    c.acct_id,
-                    @v_proc_id,
-                    @v_cur_dt,
-                    c.final_risk_score,
-                    @p_thrs_val,
+                    c.acct_id, @v_proc_id, @v_cur_dt, c.final_risk_score, @p_thrs_val,
                     CASE WHEN c.final_risk_score >= @p_thrs_val THEN 1 ELSE 0 END,
                     CONCAT('Processed with tx_cnt=', @v_trans_cnt, ', rsf=', FORMAT(@v_rsk_fctr, 'N6')),
                     GETDATE()
                 FROM @v_corr_tmp c;
             END
-            ELSE IF @v_runtm_md = 2 -- Live mode
+            ELSE IF @v_runtm_md = 2
             BEGIN
                 MERGE AccountRiskScores AS tgt
                 USING (
@@ -212,17 +206,16 @@ BEGIN
                         src.acct_id, src.final_risk_score, src.flag_value,
                         src.score_date, @v_proc_id, GETDATE(), GETDATE()
                     );
-                
-                -- Generate alerts for high risk accounts
+
                 INSERT INTO CustomerAlerts (
                     alert_type_id, customer_id, account_id, alert_date, 
                     alert_message, alert_severity, created_date, status_code
                 )
                 SELECT 
                     CASE 
-                        WHEN c.final_risk_score >= @p_thrs_val * 2 THEN 1 -- High severity
-                        WHEN c.final_risk_score >= @p_thrs_val * 1.5 THEN 2 -- Medium severity
-                        ELSE 3 -- Low severity
+                        WHEN c.final_risk_score >= @p_thrs_val * 2 THEN 1
+                        WHEN c.final_risk_score >= @p_thrs_val * 1.5 THEN 2
+                        ELSE 3
                     END,
                     tmp.cust_id,
                     c.acct_id,
@@ -241,9 +234,8 @@ BEGIN
                 WHERE c.final_risk_score >= @p_thrs_val
                 GROUP BY c.acct_id, tmp.cust_id, c.final_risk_score;
             END
-            ELSE -- Archive mode or other
+            ELSE
             BEGIN
-                -- Just log processing information
                 INSERT INTO ProcessExecutionLog (
                     process_id, process_name, execution_date, 
                     parameter_values, affected_records, status_code, comments
@@ -252,11 +244,7 @@ BEGIN
                     @v_proc_id,
                     OBJECT_NAME(@@PROCID),
                     @v_cur_dt,
-                    CONCAT('dt=', CONVERT(VARCHAR, @p_dt_init), 
-                           ', flg=', @p_flg_type, 
-                           ', thrs=', @p_thrs_val,
-                           ', acct=', @p_acct_id,
-                           ', opt=', @p_proc_opts),
+                    @log_params,
                     @v_trans_cnt,
                     'SUCCESS',
                     CONCAT('Processed in archive mode with factor=', FORMAT(@v_rsk_fctr, 'N6'))
@@ -265,7 +253,6 @@ BEGIN
         END
         ELSE
         BEGIN
-            -- Log insufficient data
             INSERT INTO ProcessExecutionLog (
                 process_id, process_name, execution_date, 
                 parameter_values, affected_records, status_code, comments
@@ -274,33 +261,26 @@ BEGIN
                 @v_proc_id,
                 OBJECT_NAME(@@PROCID),
                 @v_cur_dt,
-                CONCAT('dt=', CONVERT(VARCHAR, @p_dt_init), 
-                       ', flg=', @p_flg_type, 
-                       ', thrs=', @p_thrs_val,
-                       ', acct=', @p_acct_id,
-                       ', opt=', @p_proc_opts),
+                @log_params,
                 @v_trans_cnt,
                 'WARNING',
                 'Insufficient transaction data for full analysis'
             );
-            
-            SET @p_out_status = 2; -- Warning status
+            SET @p_out_status = 2;
         END
-        
+
         IF @@TRANCOUNT > 0 AND XACT_STATE() = 1
             COMMIT TRANSACTION;
-            
-        -- Final status
-        SET @p_out_status = ISNULL(@p_out_status, 1); -- Success if not already set
-        
+
+        SET @p_out_status = ISNULL(@p_out_status, 1);
+
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 AND XACT_STATE() != 0
             ROLLBACK TRANSACTION;
-            
+
         SET @v_err_msg = ERROR_MESSAGE();
-        
-        -- Log error
+
         INSERT INTO ErrorLog (
             error_date, procedure_name, error_number, 
             error_severity, error_state, error_message,
@@ -313,15 +293,11 @@ BEGIN
             ERROR_SEVERITY(),
             ERROR_STATE(),
             @v_err_msg,
-            CONCAT('dt=', CONVERT(VARCHAR, @p_dt_init), 
-                  ', flg=', @p_flg_type, 
-                  ', thrs=', @p_thrs_val,
-                  ', acct=', @p_acct_id,
-                  ', opt=', @p_proc_opts)
+            @log_params
         );
-        
-        SET @p_out_status = -1; -- Error status
+
+        SET @p_out_status = -1;
     END CATCH;
-    
+
     RETURN @p_out_status;
 END;
