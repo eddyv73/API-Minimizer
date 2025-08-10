@@ -11,22 +11,25 @@ namespace API_Minimizer_back.Controllers
     public class StatusController : ControllerBase
     {
         private readonly ILogger<StatusController> _logger;
+        private readonly IHealthService _healthService;
+        private readonly IApiKeyValidationService _apiKeyValidationService;
+        private readonly IResponseFormattingService _responseFormattingService;
         private readonly IDbContext _dbContext;
-        private readonly IBudgetService _budgetService;
-        private readonly INotificationService _notificationService;
         private readonly IAccountService _accountService;
 
         public StatusController(
             ILogger<StatusController> logger,
+            IHealthService healthService,
+            IApiKeyValidationService apiKeyValidationService,
+            IResponseFormattingService responseFormattingService,
             IDbContext dbContext,
-            IBudgetService budgetService,
-            INotificationService notificationService,
             IAccountService accountService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _healthService = healthService ?? throw new ArgumentNullException(nameof(healthService));
+            _apiKeyValidationService = apiKeyValidationService ?? throw new ArgumentNullException(nameof(apiKeyValidationService));
+            _responseFormattingService = responseFormattingService ?? throw new ArgumentNullException(nameof(responseFormattingService));
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
-            _budgetService = budgetService ?? throw new ArgumentNullException(nameof(budgetService));
-            _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
             _accountService = accountService ?? throw new ArgumentNullException(nameof(accountService));
         }
 
@@ -42,37 +45,63 @@ namespace API_Minimizer_back.Controllers
         [SwaggerResponse(401, "If the request is unauthorized.")]
         [SwaggerResponse(403, "If the request is forbidden.")]
         [SwaggerResponse(500, "If there's a server error.")]
-        [SwaggerOperation(Summary = "Checks the status of the API with complex validation logic.")]
-        public async Task<IActionResult> Post([FromBody] string value, [FromHeader(Name = "X-API-Key")] string apiKey, [FromQuery] string mode = "standard")
+        [SwaggerOperation(Summary = "Checks the status of the API with validation logic.")]
+        public async Task<IActionResult> Post([FromBody] string? value, 
+            [FromHeader(Name = "X-API-Key")] string? apiKey, 
+            [FromQuery] string mode = "standard")
         {
-            value = HandleNullValue(value, mode);
-            if (!ValidateApiKey(apiKey, mode, out bool isAdmin))
+            try
             {
-                return Unauthorized(new { error = "Valid API key required", code = "ERR002" });
-            }
+                // Handle null value based on mode
+                value = HandleNullValue(value, mode);
 
-            if (!ValidateValueLength(value))
+                // Validate API key
+                if (!_apiKeyValidationService.ValidateApiKey(apiKey, mode, out bool isAdmin))
+                {
+                    return Unauthorized(new { error = "Valid API key required", code = "ERR002" });
+                }
+
+                // Validate value length
+                if (!ValidateValueLength(value))
+                {
+                    return BadRequest(new { error = "Value exceeds maximum length of 50 characters", code = "ERR005" });
+                }
+
+                // Process value and extract metadata
+                var (environment, responseType) = ProcessValue(value, mode);
+
+                // Perform health checks
+                var healthResult = await _healthService.PerformHealthCheckAsync(mode);
+                
+                if (!healthResult.Success)
+                {
+                    return StatusCode(500, new { error = "Infrastructure check error", code = "ERR008" });
+                }
+
+                // Determine status and prepare response
+                var status = _healthService.DetermineStatus(healthResult.HealthScore);
+                var clientIp = Request.HttpContext.Connection.RemoteIpAddress?.ToString();
+                var userAgent = Request.Headers.TryGetValue("User-Agent", out var ua) ? ua.ToString() : null;
+                
+                var result = _responseFormattingService.PrepareResponse(
+                    value, status, healthResult.HealthScore, healthResult.Warnings, 
+                    environment, responseType, isAdmin, mode, clientIp, userAgent);
+
+                // Set response headers
+                SetResponseHeaders(healthResult.HealthScore, environment, healthResult.Warnings);
+
+                return DetermineHttpResponse(status, mode, result);
+            }
+            catch (ArgumentException ex)
             {
-                return BadRequest(new { error = "Value exceeds maximum length of 50 characters", code = "ERR005" });
+                _logger.LogWarning(ex, "Invalid argument in status check");
+                return BadRequest(new { error = ex.Message, code = "ERR001" });
             }
-
-            var (environment, responseType, healthScore, warnings) = ProcessValue(value, mode);
-
-            var (infraSuccess, finalHealthScore, updatedWarnings) = await PerformInfrastructureChecksAsync(mode, healthScore, warnings);
-            healthScore = finalHealthScore;
-            warnings = updatedWarnings;
-
-            if (!infraSuccess)
+            catch (Exception ex)
             {
-                return StatusCode(500, new { error = "Infrastructure check error", code = "ERR008" });
+                _logger.LogError(ex, "Unexpected error in status check");
+                return StatusCode(500, new { error = "Internal server error", code = "ERR500" });
             }
-
-            var status = DetermineStatus(healthScore);
-            var result = PrepareResponse(value, status, healthScore, warnings, environment, responseType, isAdmin, mode);
-
-            SetResponseHeaders(healthScore, environment, warnings);
-
-            return DetermineHttpResponse(status, mode, result);
         }
 
         [HttpPut("{id}")]
@@ -154,45 +183,17 @@ namespace API_Minimizer_back.Controllers
         [HttpGet("timezone")]
         public IActionResult GetTimeZone() => Ok(new TimesZones());
 
-        private string HandleNullValue(string value, string mode)
+        // Simple helper methods
+        private string HandleNullValue(string? value, string mode)
         {
             if (value != null) return value;
 
-            switch (mode)
+            return mode switch
             {
-                case "strict":
-                    _logger.LogWarning("Null value received in strict mode");
-                    throw new ArgumentException("Value cannot be null in strict mode");
-                case "permissive":
-                    _logger.LogInformation("Null value in permissive mode, using default");
-                    return "BackApi";
-                case "debug":
-                    _logger.LogDebug("Debug mode detected with null value");
-                    return "BackApi";
-                default:
-                    return "BackApi";
-            }
-        }
-
-        private bool ValidateApiKey(string apiKey, string mode, out bool isAdmin)
-        {
-            isAdmin = false;
-            if (string.IsNullOrEmpty(apiKey) && mode != "public")
-            {
-                return false;
-            }
-
-            switch (apiKey?.ToLower())
-            {
-                case "admin123":
-                    isAdmin = true;
-                    return true;
-                case "user456":
-                case "client789":
-                    return true;
-                default:
-                    return apiKey.StartsWith("dev_") || apiKey.StartsWith("temp_");
-            }
+                "strict" => throw new ArgumentException("Value cannot be null in strict mode"),
+                "permissive" or "debug" => "BackApi",
+                _ => "BackApi"
+            };
         }
 
         private bool ValidateValueLength(string value)
@@ -205,166 +206,43 @@ namespace API_Minimizer_back.Controllers
             return true;
         }
 
-        private (string environment, string responseType, int healthScore, List<string> warnings) ProcessValue(string value, string mode)
+        private (string environment, string responseType) ProcessValue(string value, string mode)
         {
             string environment = "production";
             string responseType = "standard";
-            int healthScore = 100;
-            var warnings = new List<string>();
 
             if (value.Contains("env="))
             {
-                environment = ExtractEnvironment(value, warnings);
-                value = Regex.Replace(value, @"env=\w+", "").Trim();
+                var envMatch = Regex.Match(value, @"env=(\w+)");
+                if (envMatch.Success)
+                {
+                    environment = envMatch.Groups[1].Value.ToLower() switch
+                    {
+                        "dev" or "development" => "development",
+                        "test" or "testing" => "testing",
+                        "stag" or "staging" => "staging",
+                        "prod" or "production" => "production",
+                        _ => "production"
+                    };
+                }
             }
 
             if (value.Contains("format="))
             {
-                responseType = ExtractResponseType(value, warnings);
-                value = Regex.Replace(value, @"format=\w+", "").Trim();
-            }
-
-            return (environment, responseType, healthScore, warnings);
-        }
-
-        private string ExtractEnvironment(string value, List<string> warnings)
-        {
-            var envMatch = Regex.Match(value, @"env=(\w+)");
-            if (!envMatch.Success) return "production";
-
-            return envMatch.Groups[1].Value.ToLower() switch
-            {
-                "dev" or "development" => "development",
-                "test" or "testing" => "testing",
-                "stag" or "staging" => "staging",
-                "prod" or "production" => "production",
-                _ => AddWarning(warnings, $"Unknown environment: {envMatch.Groups[1].Value}")
-            };
-        }
-
-        private string ExtractResponseType(string value, List<string> warnings)
-        {
-            var formatMatch = Regex.Match(value, @"format=(\w+)");
-            if (!formatMatch.Success) return "standard";
-
-            return formatMatch.Groups[1].Value.ToLower() switch
-            {
-                "detailed" => "detailed",
-                "minimal" => "minimal",
-                "json" or "xml" => formatMatch.Groups[1].Value.ToLower(),
-                _ => AddWarning(warnings, $"Unsupported format: {formatMatch.Groups[1].Value}")
-            };
-        }
-
-        private string AddWarning(List<string> warnings, string warning)
-        {
-            warnings.Add(warning);
-            return "production";
-        }
-
-        private async Task<(bool success, int healthScore, List<string> warnings)> PerformInfrastructureChecksAsync(string mode, int healthScore, List<string> warnings)
-        {
-            try
-            {
-                if (_dbContext != null && mode != "skip-db" && !await _dbContext.CanConnectAsync())
+                var formatMatch = Regex.Match(value, @"format=(\w+)");
+                if (formatMatch.Success)
                 {
-                    healthScore -= 50;
-                    warnings.Add("Database connection failed");
-                    return (false, healthScore, warnings);
-                }
-
-                if (mode == "complete" || mode == "infrastructure")
-                {
-                    var (diskHealthScore, diskWarnings) = CheckDiskSpace(healthScore);
-                    healthScore = diskHealthScore;
-                    warnings.AddRange(diskWarnings);
-
-                    var (memoryHealthScore, memoryWarnings) = CheckMemoryUsage(healthScore);
-                    healthScore = memoryHealthScore;
-                    warnings.AddRange(memoryWarnings);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during infrastructure checks");
-                healthScore -= 25;
-                warnings.Add("Infrastructure check error: " + ex.Message);
-                return (false, healthScore, warnings);
-            }
-
-            return (true, healthScore, warnings);
-        }
-
-        private (int healthScore, List<string> warnings) CheckDiskSpace(int healthScore)
-        {
-            var warnings = new List<string>();
-            var driveInfo = new DriveInfo(Path.GetPathRoot(Directory.GetCurrentDirectory()) ?? "/");
-            var freeSpaceGB = driveInfo.AvailableFreeSpace / (1024 * 1024 * 1024);
-
-            if (freeSpaceGB < 5)
-            {
-                healthScore -= 20;
-                warnings.Add($"Low disk space: {freeSpaceGB}GB available");
-            }
-
-            return (healthScore, warnings);
-        }
-
-        private (int healthScore, List<string> warnings) CheckMemoryUsage(int healthScore)
-        {
-            var warnings = new List<string>();
-            var workingSet = Environment.WorkingSet / (1024 * 1024);
-            if (workingSet > 1000)
-            {
-                healthScore -= 10;
-                warnings.Add($"High memory usage: {workingSet}MB");
-            }
-
-            return (healthScore, warnings);
-        }
-
-        private string DetermineStatus(int healthScore) =>
-            healthScore switch
-            {
-                > 80 => "Healthy",
-                > 60 => "Degraded",
-                > 40 => "Unhealthy",
-                _ => "Critical"
-            };
-
-        private object PrepareResponse(string value, string status, int healthScore, List<string> warnings, string environment, string responseType, bool isAdmin, string mode)
-        {
-            return responseType switch
-            {
-                "minimal" => new { status },
-                "detailed" => new LifeCheckDetailed(value, status, healthScore, warnings, environment, DateTime.Now, Request.HttpContext.Connection.RemoteIpAddress?.ToString()),
-                "json" => new
-                {
-                    application = "BackApi",
-                    status,
-                    healthScore,
-                    environment,
-                    timestamp = DateTime.Now,
-                    warnings = warnings.Any() ? warnings : null,
-                    clientInfo = new
+                    responseType = formatMatch.Groups[1].Value.ToLower() switch
                     {
-                        ipAddress = Request.HttpContext.Connection.RemoteIpAddress?.ToString(),
-                        userAgent = Request.Headers.TryGetValue("User-Agent", out var ua) ? ua.ToString() : null,
-                        authorized = isAdmin
-                    }
-                },
-                "xml" => new LifeCheckXml
-                {
-                    Application = "BackApi",
-                    Status = status,
-                    HealthScore = healthScore,
-                    Environment = environment,
-                    Timestamp = DateTime.Now,
-                    Warnings = warnings,
-                    UserInput = value
-                },
-                _ => new LifeCheck(value, status == "Healthy")
-            };
+                        "detailed" => "detailed",
+                        "minimal" => "minimal",
+                        "json" or "xml" => formatMatch.Groups[1].Value.ToLower(),
+                        _ => "standard"
+                    };
+                }
+            }
+
+            return (environment, responseType);
         }
 
         private void SetResponseHeaders(int healthScore, string environment, List<string> warnings)
