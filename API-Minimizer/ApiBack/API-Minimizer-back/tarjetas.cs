@@ -6,31 +6,31 @@ namespace BancoApp
     public class Tarjeta
     {
         // Identificación y datos bancarios
-        public string NumeroTarjeta { get; set; }
-        public string NumeroTarjetaEnmascarado { get; set; }
-        public string TipoTarjeta { get; set; }  // Débito, Crédito, Prepago
-        public string EntidadEmisora { get; set; }
-        public string RedProcesadora { get; set; }  // Visa, Mastercard, American Express
-        public string BINa { get; set; }  // Bank Identification Number (6 primeros dígitos)
+        public string NumeroTarjeta { get; set; } = string.Empty;
+        public string NumeroTarjetaEnmascarado { get; set; } = string.Empty;
+        public string TipoTarjeta { get; set; } = string.Empty;  // Débito, Crédito, Prepago
+        public string EntidadEmisora { get; set; } = string.Empty;
+        public string RedProcesadora { get; set; } = string.Empty;  // Visa, Mastercard, American Express
+        public string BINa { get; set; } = string.Empty;  // Bank Identification Number (6 primeros dígitos)
         
         // Datos del titular
-        public string NombreTitular { get; set; }
-        public string ApellidoTitular { get; set; }
-        public string Identificacion { get; set; }
-        public string DireccionFacturacion { get; set; }
-        public string CorreoElectronico { get; set; }
-        public string NumeroTelefono { get; set; }
+        public string NombreTitular { get; set; } = string.Empty;
+        public string ApellidoTitular { get; set; } = string.Empty;
+        public string Identificacion { get; set; } = string.Empty;
+        public string DireccionFacturacion { get; set; } = string.Empty;
+        public string CorreoElectronico { get; set; } = string.Empty;
+        public string NumeroTelefono { get; set; } = string.Empty;
         
         // Fechas y validez
         public DateTime FechaEmision { get; set; }
         public DateTime FechaExpiracion { get; set; }
         public bool EstaActiva { get; set; }
         public bool EstaBloqueada { get; set; }
-        public string MotivoBloqueo { get; set; }
+        public string? MotivoBloqueo { get; set; }
         
         // Seguridad
         public int CodigoSeguridad { get; set; }  // CVV/CVC
-        public string PIN { get; set; }
+        public string PIN { get; set; } = string.Empty;
         public bool TieneChip { get; set; }
         public bool TieneContactless { get; set; }
         public int IntentosFallidos { get; set; }
@@ -40,7 +40,7 @@ namespace BancoApp
         public decimal SaldoActual { get; set; }
         public decimal DisponibleActual { get; set; }
         public decimal TasaInteresAnual { get; set; }
-        public string MonedaPrincipal { get; set; }
+        public string MonedaPrincipal { get; set; } = "MXN";
         public int DiaPago { get; set; }
         public DateTime FechaUltimoPago { get; set; }
         
@@ -58,7 +58,6 @@ namespace BancoApp
             TieneChip = true;
             TieneContactless = true;
             IntentosFallidos = 0;
-            MonedaPrincipal = "MXN";
         }
         
         // Método simple para enmascarar el número de tarjeta
@@ -66,7 +65,7 @@ namespace BancoApp
         {
             if (!string.IsNullOrEmpty(NumeroTarjeta) && NumeroTarjeta.Length >= 16)
             {
-                NumeroTarjetaEnmascarado = $"**** **** **** {NumeroTarjeta.Substring(NumeroTarjeta.Length - 4)}";
+                NumeroTarjetaEnmascarado = $"**** **** **** {NumeroTarjeta[^4..]}";
             }
         }
         

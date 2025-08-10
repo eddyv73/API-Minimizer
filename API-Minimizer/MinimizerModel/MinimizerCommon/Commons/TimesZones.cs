@@ -1,17 +1,29 @@
 namespace MinimizerCommon.Commons;
 
-    // add a class with array of time zones defined by two properties time and name of the time zone
-    public class TimesZones
+/// <summary>
+/// Provides time zone information with time and name properties
+/// </summary>
+public class TimesZones
+{
+    public TimesZones()
     {
-            // the constuctor will initialize the array with a time zones utc
-            public TimesZones()
-            {
-                TimeZones = new List<TimeZone>
-                {
-                    new TimeZone { Time = DateTime.Now.ToUniversalTime().ToString(), Name = "UTC" },
-                    new TimeZone { Time = DateTime.Now.AddHours(-5).ToString(), Name = "GMT-5" }
-                };
-            }
-        public string Time { get; set; }
-        public string Name { get; set; }
+        var now = DateTime.Now;
+        Zones = new List<TimeZoneData>
+        {
+            new TimeZoneData { Time = now.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss"), Name = "UTC" },
+            new TimeZoneData { Time = now.AddHours(-5).ToString("yyyy-MM-dd HH:mm:ss"), Name = "GMT-5" },
+            new TimeZoneData { Time = now.AddHours(-6).ToString("yyyy-MM-dd HH:mm:ss"), Name = "GMT-6" }
+        };
     }
+
+    public List<TimeZoneData> Zones { get; set; }
+}
+
+/// <summary>
+/// Represents time zone data with time and name
+/// </summary>
+public class TimeZoneData
+{
+    public string Time { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+}

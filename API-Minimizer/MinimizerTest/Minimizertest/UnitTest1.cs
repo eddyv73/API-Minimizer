@@ -57,7 +57,7 @@ namespace Minimizertest
         public void Test6()
         {
             var timeZones = new TimesZones();
-            var timeZone = timeZones.TimeZones.Find(x => x.Name == "UTC");
+            var timeZone = timeZones.Zones.Find(x => x.Name == "UTC");
             Assert.IsNotNull(timeZone);
         }        
 
