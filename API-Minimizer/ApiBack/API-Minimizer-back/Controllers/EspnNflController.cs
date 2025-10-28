@@ -37,7 +37,7 @@ namespace API_Minimizer_back.Controllers
                 var httpClient = _httpClientFactory.CreateClient();
                 var url = $"https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit={limit}&dates={year}";
                 
-                _logger.LogInformation($"Fetching NFL scoreboard data from ESPN API: {url}");
+                _logger.LogInformation("Fetching NFL scoreboard data from ESPN API for year {Year} with limit {Limit}", year, limit);
                 
                 var response = await httpClient.GetAsync(url);
                 
@@ -93,12 +93,25 @@ namespace API_Minimizer_back.Controllers
         [SwaggerOperation(Summary = "Get NFL scoreboard data by date range", Description = "Retrieves NFL scoreboard data from ESPN API for a specific date range")]
         public async Task<IActionResult> GetNflScoreboardByDateRange([FromQuery] string startDate, [FromQuery] string endDate, [FromQuery] int limit = 1000)
         {
+            // Validate date format to prevent log forging and ensure valid input
+            if (string.IsNullOrWhiteSpace(startDate) || string.IsNullOrWhiteSpace(endDate))
+            {
+                return BadRequest("Start date and end date are required");
+            }
+
+            // Sanitize input - only allow digits in date format
+            if (!System.Text.RegularExpressions.Regex.IsMatch(startDate, @"^\d{8}$") || 
+                !System.Text.RegularExpressions.Regex.IsMatch(endDate, @"^\d{8}$"))
+            {
+                return BadRequest("Invalid date format. Use YYYYMMDD format (e.g., 20230901)");
+            }
+
             try
             {
                 var httpClient = _httpClientFactory.CreateClient();
                 var url = $"https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit={limit}&dates={startDate}-{endDate}";
                 
-                _logger.LogInformation($"Fetching NFL scoreboard data from ESPN API: {url}");
+                _logger.LogInformation("Fetching NFL scoreboard data from ESPN API for date range {StartDate} to {EndDate} with limit {Limit}", startDate, endDate, limit);
                 
                 var response = await httpClient.GetAsync(url);
                 
