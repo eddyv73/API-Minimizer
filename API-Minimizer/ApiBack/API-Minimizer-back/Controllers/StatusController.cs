@@ -23,29 +23,16 @@ namespace API_Minimizer_back.Controllers
         {
             return "value";
         }
-
-        // POST api/<StatusController>
         /// <summary>
-        /// Represents an action result that returns an HTTP status code and an object to write to the response.
-        /// This method is called to check the status of the API. Eddy
-        ///
-        /// <returns>An IActionResult object.</returns>
-        /// <param name="value">The value to check.</param>
-        /// <response code="200">Returns the status of the API.</response>
-        /// <response code="400">If the item is null.</response>
-        /// <response code="500">If the item is null.</response>
-        /// <remarks>
-        /// Sample request:
-        ///
-        ///     POST /Todo
-        ///     {
-        ///        "value": "BackApi"
-        ///     }
-        ///
-        /// </remarks>
-        /// <param name="value">The value to check.</param>
-        /// <returns>An IActionResult object.</returns>
-        ///  </summary>
+        /// Checks the status of the API and returns a LifeCheck result.
+        /// If the request body <paramref name="value"/> is null, the name defaults to "BackApi".
+        /// </summary>
+        /// <param name="value">Optional string read from the request body to identify the status check; may be null.</param>
+        /// <returns>HTTP 200 (OK) containing a LifeCheck object describing the API status.</returns>
+        /// <response code="200">Returns the LifeCheck status object.</response>
+        /// <response code="400">Bad request — input was null or invalid (declared in Swagger metadata).</response>
+        /// <response code="500">Internal server error (declared in Swagger metadata).</response>
+        /// <remarks>The returned LifeCheck is constructed with the provided or default name and has its Status set to false.</remarks>
         [HttpPost]
         [SwaggerResponse(200, "Returns the status of the API.")]
         [SwaggerResponse(400, "If the item is null.")]
@@ -57,7 +44,11 @@ namespace API_Minimizer_back.Controllers
             {
                 value = "BackApi";
             }
-            var status = new LifeCheck(value, true);
+
+            var status = new LifeCheck(value, true)
+            {
+                Status = false
+            };
             return Ok(status);
         }
 
@@ -65,12 +56,21 @@ namespace API_Minimizer_back.Controllers
         [HttpPut("{id}")]
         public void Put(int id, [FromBody] string value)
         {
+            DateTime currentDate = DateTime.Now;
         }
 
         // DELETE api/<StatusController>/5
         [HttpDelete("{id}")]
         public void Delete(int id)
         {
+        }
+
+        // GET api/<StatusController>/currentdate
+        [HttpGet("currentdate")]
+        public string GetCurrentDate()
+        {
+            DateTime currentDate = DateTime.Now;
+            return currentDate.ToString();
         }
     }
 }

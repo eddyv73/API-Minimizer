@@ -18,6 +18,10 @@ namespace API_Minimizer_back.Controllers
             _logger = logger;
         }
 
+        /// <summary>
+        /// Retrieves a collection of weather forecasts.
+        /// </summary>
+        /// <returns>An IEnumerable of WeatherForecast objects.</returns>
         [HttpGet(Name = "GetWeatherForecast")]
         public IEnumerable<WeatherForecast> Get()
         {
@@ -29,5 +33,6 @@ namespace API_Minimizer_back.Controllers
             })
             .ToArray();
         }
+
     }
 }
