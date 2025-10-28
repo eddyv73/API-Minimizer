@@ -23,7 +23,7 @@ namespace MinimizerCommon.Commons
     /// <summary>
     /// Represents the status of a server.
     /// </summary>
-    /// /// /// public class ServerStatus
+    public class ServerStatus
     {
         // add a constructor with 2 parameters
         public ServerStatus(string serverName, bool status)

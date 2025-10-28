@@ -49,7 +49,7 @@ namespace API_Minimizer_back.Controllers
             {
                 Status = false
             };
-            return Ok(status)
+            return Ok(status);
         }
 
         // PUT api/<StatusController>/5
