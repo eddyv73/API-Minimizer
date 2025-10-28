@@ -82,8 +82,13 @@ La API estará disponible en `https://localhost:5002` (o el puerto configurado)
 ### Opción 2: Ejecutar con Docker Compose
 
 ```bash
-cd API-Minimizer
+cd API-Minimizer/API-Minimizer
 docker-compose up --build
+```
+
+O desde el directorio raíz del repositorio:
+```bash
+docker-compose -f API-Minimizer/API-Minimizer/docker-compose.yml up --build
 ```
 
 ## Documentación Swagger
